@@ -5,7 +5,12 @@ import edu.uic.cs553.sim.core.models.EnrichedGraph
 
 object RuntimeBuilder:
 
-  def run(graph: EnrichedGraph): Unit =
+  final case class RunningSimulation(
+    system: ActorSystem,
+    nodeRefs: Map[Int, ActorRef]
+  )
+
+  def run(graph: EnrichedGraph): RunningSimulation =
     val system = ActorSystem("sim")
 
     val nodeRefs: Map[Int, ActorRef] =
@@ -33,8 +38,16 @@ object RuntimeBuilder:
       nodeRefs(node.id) ! NodeActor.Init(
         neighbors = neighbors,
         allowedOnEdge = allowedOnEdge,
-        pdf = pdf
+        pdf = pdf,
+        timerEnabled = node.timerEnabled,
+        tickEveryMs = node.tickEveryMs,
+        inputEnabled = node.inputEnabled
       )
     }
 
     nodeRefs.get(0).foreach(_ ! NodeActor.Start)
+
+    RunningSimulation(
+      system = system,
+      nodeRefs = nodeRefs
+    )

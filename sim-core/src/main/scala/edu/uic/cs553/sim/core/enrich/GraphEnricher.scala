@@ -18,7 +18,17 @@ object GraphEnricher:
 
     val enrichedNodes =
       graph.nodes.map { id =>
-        EnrichedNode(id, defaultPdf)
+        val timerEnabled = id == 0
+        val tickEveryMs = 1000
+        val inputEnabled = id == 1 || id == 2
+
+        EnrichedNode(
+          id = id,
+          pdf = defaultPdf,
+          timerEnabled = timerEnabled,
+          tickEveryMs = tickEveryMs,
+          inputEnabled = inputEnabled
+        )
       }
 
     val enrichedEdges =

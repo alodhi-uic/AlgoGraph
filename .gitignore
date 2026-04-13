@@ -45,3 +45,5 @@ build/
 
 ### Scala ###
 .bsp/
+sim-cli/1/
+netgamesim/output/

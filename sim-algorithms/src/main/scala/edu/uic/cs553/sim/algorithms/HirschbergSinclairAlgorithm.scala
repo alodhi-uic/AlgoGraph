@@ -27,6 +27,9 @@ final class HirschbergSinclairAlgorithm extends DistributedAlgorithm:
   private var ccwReplied: Boolean   = false
   private var leader: Option[Int]   = None
 
+  // Set to false if topology validation fails — all handlers short-circuit
+  private var valid: Boolean = true
+
   // Ring neighbors resolved from ctx on first use
   private var cw: Int  = -1
   private var ccw: Int = -1
@@ -34,20 +37,46 @@ final class HirschbergSinclairAlgorithm extends DistributedAlgorithm:
   // ---- lifecycle ------------------------------------------------
 
   override def onStart(ctx: AlgorithmContext): Unit =
-    resolveNeighbors(ctx)
-    if cw == -1 then
-      ctx.log(s"[HS] node ${ctx.nodeId}: need at least 2 neighbors for HS; found ${ctx.neighbors.size}")
+    if !validateTopology(ctx) then () // error already logged
     else
+      resolveNeighbors(ctx)
       ctx.log(s"[HS] node ${ctx.nodeId}: starting HS — CW=$cw CCW=$ccw")
       sendProbes(ctx)
 
   override def onMessage(ctx: AlgorithmContext, from: Int, kind: String, payload: String): Unit =
-    if cw == -1 then resolveNeighbors(ctx)
-    kind match
-      case "HS_PROBE"  => handleProbe(ctx, payload)
-      case "HS_REPLY"  => handleReply(ctx, payload)
-      case "HS_LEADER" => handleLeader(ctx, from, payload)
-      case _           => ()
+    if !valid then
+      ctx.log(s"[HS] node ${ctx.nodeId}: ignoring message — topology is not a valid ring")
+    else
+      if cw == -1 then resolveNeighbors(ctx)
+      kind match
+        case "HS_PROBE"  => handleProbe(ctx, payload)
+        case "HS_REPLY"  => handleReply(ctx, payload)
+        case "HS_LEADER" => handleLeader(ctx, from, payload)
+        case _           => ()
+
+  // ---- topology validation --------------------------------------
+
+  /**
+   * Validates that this node looks like a valid HS ring participant.
+   * A ring node must have exactly 2 neighbors — one CW, one CCW.
+   *
+   * This is a local check only (the algorithm sees only its own neighbors).
+   * It catches the most common mistakes: chains, trees, stars, and isolated nodes.
+   * It cannot detect broken cycles or disconnected components from a single node's view.
+   */
+  private def validateTopology(ctx: AlgorithmContext): Boolean =
+    val n = ctx.neighbors.size
+    if n != 2 then
+      valid = false
+      val reason = n match
+        case 0 => "node is isolated (no neighbors) — HS requires a bidirectional ring"
+        case 1 => "node has only 1 neighbor — this looks like a chain or tree, not a ring"
+        case _ => s"node has $n neighbors — a ring node must have exactly 2 (one CW, one CCW)"
+      ctx.log(s"[HS] ERROR node ${ctx.nodeId}: invalid topology — $reason")
+      ctx.log(s"[HS] ERROR node ${ctx.nodeId}: generate a ring graph using topology = hirschbergsinclair in NetGameSim")
+      false
+    else
+      true
 
   // ---- neighbor resolution --------------------------------------
 

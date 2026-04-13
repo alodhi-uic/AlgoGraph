@@ -30,5 +30,6 @@ lazy val simAlgorithms = (project in file("sim-algorithms"))
 lazy val simCli = (project in file("sim-cli"))
   .dependsOn(simCore, simRuntimeAkka, simAlgorithms)
   .settings(
-    name := "sim-cli"
+    name := "sim-cli",
+    libraryDependencies += "com.typesafe" % "config" % "1.4.2"
   )

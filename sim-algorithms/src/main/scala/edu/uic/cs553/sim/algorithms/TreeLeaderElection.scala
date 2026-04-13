@@ -23,9 +23,11 @@ final class TreeLeaderElection extends DistributedAlgorithm:
   override def name: String = "tree-leader-election"
 
   // ---- per-node state -------------------------------------------
-  private var maxIdSeen: Int        = -1
+  private var maxIdSeen: Int         = -1
   private var receivedFrom: Set[Int] = Set.empty
-  private var leader: Option[Int]   = None
+  private var leader: Option[Int]    = None
+  private var forwarded: Boolean     = false   // have we already sent TREE_MSG upstream?
+  private var forwardedTo: Int       = -1      // which neighbor we forwarded to
 
   // ---- lifecycle ------------------------------------------------
 
@@ -36,6 +38,8 @@ final class TreeLeaderElection extends DistributedAlgorithm:
     if ctx.neighbors.size == 1 then
       // Leaf: nothing left to wait for, send immediately
       val parent = ctx.neighbors.head
+      forwarded   = true
+      forwardedTo = parent
       ctx.log(s"[TREE] node ${ctx.nodeId}: leaf → sending TREE_MSG($maxIdSeen) to $parent")
       ctx.send(parent, "TREE_MSG", maxIdSeen.toString)
 
@@ -60,14 +64,22 @@ final class TreeLeaderElection extends DistributedAlgorithm:
         val remaining = ctx.neighbors -- receivedFrom
 
         if remaining.isEmpty then
-          // Heard from every neighbor → this node is the root
-          leader = Some(maxIdSeen)
-          ctx.log(s"[TREE] node ${ctx.nodeId}: ROOT — elected leader=$maxIdSeen, broadcasting")
-          ctx.broadcast("TREE_LEADER", maxIdSeen.toString)
+          // Heard from every neighbor — this node is a root candidate.
+          // Center-edge case: if we already forwarded to `from`, both endpoints of that
+          // edge raced to forward to each other.  Break symmetry with node ID: only the
+          // higher-ID node becomes ROOT; the lower-ID node waits for the TREE_LEADER.
+          val isCenterEdge = forwarded && forwardedTo == from
+          if !isCenterEdge || ctx.nodeId > from then
+            if leader.isEmpty then
+              leader = Some(maxIdSeen)
+              ctx.log(s"[TREE] node ${ctx.nodeId}: ROOT — elected leader=$maxIdSeen, broadcasting")
+              ctx.broadcast("TREE_LEADER", maxIdSeen.toString)
 
         else if remaining.size == 1 then
           // Heard from all but one → forward max id upstream
           val next = remaining.head
+          forwarded   = true
+          forwardedTo = next
           ctx.log(s"[TREE] node ${ctx.nodeId}: forwarding TREE_MSG($maxIdSeen) to $next")
           ctx.send(next, "TREE_MSG", maxIdSeen.toString)
 

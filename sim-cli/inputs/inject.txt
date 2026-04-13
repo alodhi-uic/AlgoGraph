@@ -1,0 +1,14 @@
+# Injection script for file-driven external message delivery.
+#
+# Format: <delayMs>  <nodeId>  <kind>  <payload>
+#
+#   delayMs  — milliseconds after simulation start to deliver the message
+#   nodeId   — target node (must be listed under sim.initiators.inputs in application.conf)
+#   kind     — message kind (e.g. WORK, PING, GOSSIP)
+#   payload  — arbitrary string payload
+#
+# Lines starting with # are comments and are ignored.
+# Lines are sorted by delayMs before delivery, so order here does not matter.
+
+1500 1 WORK external-job-1
+3000 2 PING hello-from-driver

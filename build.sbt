@@ -13,7 +13,7 @@ lazy val simCore = (project in file("sim-core"))
   )
 
 lazy val simRuntimeAkka = (project in file("sim-runtime-akka"))
-  .dependsOn(simCore)
+  .dependsOn(simCore, simAlgorithms)
   .settings(
     name := "sim-runtime-akka",
     libraryDependencies ++= Seq(
@@ -22,7 +22,7 @@ lazy val simRuntimeAkka = (project in file("sim-runtime-akka"))
   )
 
 lazy val simAlgorithms = (project in file("sim-algorithms"))
-  .dependsOn(simCore, simRuntimeAkka)
+  .dependsOn(simCore)
   .settings(
     name := "sim-algorithms"
   )

@@ -3,6 +3,7 @@ package edu.uic.cs553
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 
+import edu.uic.cs553.sim.algorithms.{HirschbergSinclairAlgorithm, TreeLeaderElection}
 import edu.uic.cs553.sim.core.enrich.GraphEnricher
 import edu.uic.cs553.sim.core.io.DotGraphLoader
 import edu.uic.cs553.sim.runtime.NodeActor
@@ -10,13 +11,18 @@ import edu.uic.cs553.sim.runtime.RuntimeBuilder
 
 object App:
   def main(args: Array[String]): Unit =
-    val graph = DotGraphLoader.load("netgamesim/output/quickrun.ngs.ngs.dot")
+    val graph = DotGraphLoader.load("/Users/apoorvlodhi/Distributed/NetGameSim/outputs/NetGraph_12-04-26-16-45-47.ngs.dot")
     val enrichedGraph = GraphEnricher.enrich(graph)
 
     println(s"Nodes: ${graph.nodes.size}")
     println(s"Edges: ${graph.edges.size}")
 
-    val running = RuntimeBuilder.run(enrichedGraph)
+    val algorithmFactories: Seq[() => edu.uic.cs553.sim.algorithms.DistributedAlgorithm] = Seq(
+      () => new HirschbergSinclairAlgorithm,
+      () => new TreeLeaderElection
+    )
+
+    val running = RuntimeBuilder.run(enrichedGraph, algorithmFactories)
 
     Thread.sleep(1500)
 

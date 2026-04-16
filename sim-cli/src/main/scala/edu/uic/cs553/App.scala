@@ -14,6 +14,7 @@ import edu.uic.cs553.sim.core.io.DotGraphLoader
 import edu.uic.cs553.sim.core.models.Pdf
 import edu.uic.cs553.sim.runtime.NodeActor
 import edu.uic.cs553.sim.runtime.RuntimeBuilder
+import edu.uic.cs553.sim.runtime.SimMetrics
 
 object App:
   def main(args: Array[String]): Unit =
@@ -55,6 +56,7 @@ object App:
 
     // ── Run for configured duration then shut down ──────────────────────────
     Thread.sleep(runDuration)
+    println(SimMetrics.report())
     Await.result(running.system.terminate(), 5.seconds)
 
   // ── Config parsing ────────────────────────────────────────────────────────

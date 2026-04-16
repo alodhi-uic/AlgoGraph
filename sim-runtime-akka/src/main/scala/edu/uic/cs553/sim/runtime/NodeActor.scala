@@ -53,17 +53,20 @@ class NodeActor(id: Int, algorithms: Seq[DistributedAlgorithm]) extends Actor wi
       generateAndSendOneMessage()
 
     case Tick =>
+      SimMetrics.recordTimerTick()
       algorithms.foreach(_.onTick(buildContext()))
       generateAndSendOneMessage()
 
     case ExternalInput(kind, payload) =>
       if inputEnabled then
+        SimMetrics.recordExternalInput()
         println(s"Node $id accepted external input kind=$kind")
         sendByKind(kind, payload)
       else
         println(s"Node $id rejected external input (not an input node)")
 
     case Envelope(from, kind, payload) =>
+      SimMetrics.recordReceived()
       println(s"Node $id received $kind from $from payload=$payload")
       algorithms.foreach(_.onMessage(buildContext(), from, kind, payload))
 
@@ -91,6 +94,7 @@ class NodeActor(id: Int, algorithms: Seq[DistributedAlgorithm]) extends Actor wi
   private def sendAlgorithmMsg(to: Int, kind: String, payload: String): Unit =
     neighbors.get(to) match
       case Some(ref) =>
+        SimMetrics.recordAlgorithmMsg()
         ref ! Envelope(id, kind, payload)
       case None =>
         println(s"Node $id: cannot send $kind to unknown neighbor $to")
@@ -102,9 +106,12 @@ class NodeActor(id: Int, algorithms: Seq[DistributedAlgorithm]) extends Actor wi
     val allowed = allowedOnEdge.getOrElse(to, Set.empty)
     if allowed.contains(kind) then
       neighbors.get(to) match
-        case Some(ref) => ref ! Envelope(id, kind, payload)
-        case None      => println(s"Node $id: no ref for neighbor $to")
+        case Some(ref) =>
+          SimMetrics.recordAppMsgSent()
+          ref ! Envelope(id, kind, payload)
+        case None => println(s"Node $id: no ref for neighbor $to")
     else
+      SimMetrics.recordAppMsgDropped()
       println(s"Node $id: edge to $to does not allow $kind")
 
   private def generateAndSendOneMessage(): Unit =

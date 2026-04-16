@@ -23,6 +23,9 @@ final class TreeLeaderElection extends DistributedAlgorithm:
   override def name: String = "tree-leader-election"
 
   // ---- per-node state -------------------------------------------
+  // Each NodeActor creates its own TreeLeaderElection instance (via factory), so
+  // these vars are actor-local and mutated only during single-threaded message
+  // delivery — no synchronization required.  See DistributedAlgorithm for rationale.
   private var maxIdSeen: Int         = -1
   private var receivedFrom: Set[Int] = Set.empty
   private var leader: Option[Int]    = None

@@ -48,6 +48,17 @@ lazy val simCli = (project in file("sim-cli"))
     run  / cinnamon := true,
     test / cinnamon := true,
 
+    // Run the forked JVM from the project root so that relative paths in
+    // application.conf (e.g. netgamesim/output, inputs/inject.txt) resolve
+    // correctly on any machine without absolute path hardcoding.
+    run / baseDirectory := (LocalRootProject / baseDirectory).value,
+
+    // Forward stdin from the sbt shell to the forked JVM so that interactive
+    // injection mode can read commands typed at the terminal.
+    // NOTE: only works when launched from inside the sbt shell (type `sbt`,
+    // then `simCli/run`), not from batch mode (`sbt simCli/run`).
+    run / connectInput := true,
+
     cinnamonLogLevel := "INFO",
 
     libraryDependencies ++= Seq(

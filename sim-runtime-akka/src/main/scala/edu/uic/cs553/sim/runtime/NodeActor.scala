@@ -8,8 +8,8 @@ import edu.uic.cs553.sim.algorithms.DistributedAlgorithm
 import edu.uic.cs553.sim.core.AlgorithmContext
 
 object NodeActor:
-  def props(id: Int, algorithms: Seq[DistributedAlgorithm]): Props =
-    Props(new NodeActor(id, algorithms))
+  def props(id: Int, algorithms: Seq[DistributedAlgorithm], seed: Int = 0): Props =
+    Props(new NodeActor(id, algorithms, seed))
 
   sealed trait Msg
 
@@ -27,15 +27,53 @@ object NodeActor:
   case object Start                                                     extends Msg
   private case object Tick                                              extends Msg
 
-class NodeActor(id: Int, algorithms: Seq[DistributedAlgorithm]) extends Actor with Timers:
+/**
+ * Actor that represents a single graph node in the simulation.
+ *
+ * Message protocol
+ * ────────────────
+ *   Init          — wires the actor's topology: neighbor ActorRefs, per-edge label sets,
+ *                   node PDF, timer flag, and input flag.  Sent once by RuntimeBuilder
+ *                   before the simulation starts.
+ *   Start         — fires all algorithm onStart callbacks and generates one background
+ *                   message.  Sent after every actor has received Init.
+ *   Tick          — periodic timer event (only timer-enabled nodes schedule this).
+ *                   Drives algorithm onTick callbacks and one PDF-sampled background message.
+ *   ExternalInput — message injected from the CLI driver (file injection or test harness).
+ *                   Only accepted when the node is marked inputEnabled in SimConfig.
+ *   Envelope      — peer-to-peer message from another node, carrying from/kind/payload.
+ *                   Triggers algorithm onMessage callbacks on every arrival.
+ *
+ * Two send paths
+ * ──────────────
+ *   sendAlgorithmMsg — used by algorithms via AlgorithmContext; bypasses edge-label checks
+ *                      so algorithm control messages (HS_PROBE, TREE_MSG, DS_WORK, etc.)
+ *                      are never silently dropped by application-layer label constraints.
+ *   sendAppMsg       — used for background application traffic; enforces edge labels so only
+ *                      permitted message kinds traverse a given channel.
+ *
+ * Algorithm integration
+ * ─────────────────────
+ *   Each NodeActor holds a Seq[DistributedAlgorithm] (one instance per registered algorithm,
+ *   created fresh per node by RuntimeBuilder).  On every lifecycle event the actor calls the
+ *   corresponding hook on every algorithm, passing an AlgorithmContext that bundles the
+ *   node's identity, neighbor set, and the sendAlgorithmMsg send path.
+ */
+class NodeActor(id: Int, algorithms: Seq[DistributedAlgorithm], seed: Int = 0) extends Actor with Timers:
   import NodeActor.*
 
+  // Actor-local mutable state — populated once via the Init message before Start fires.
+  // Mutation inside an actor is safe because Akka guarantees single-threaded message
+  // delivery per actor; no external synchronization or atomic references are needed.
   private var neighbors:     Map[Int, ActorRef]    = Map.empty
   private var allowedOnEdge: Map[Int, Set[String]] = Map.empty
   private var pdf:           Map[String, Double]   = Map.empty
   private var inputEnabled:  Boolean               = false
 
-  private val rng = new Random(id)
+  // XOR of global seed and node id: nodes produce independent sequences that are all
+  // reproducible — change sim.seed in application.conf to get a different traffic pattern
+  // while keeping the same graph topology.
+  private val rng = new Random(seed.toLong ^ id.toLong)
 
   def receive: Receive =
 
@@ -124,6 +162,17 @@ class NodeActor(id: Int, algorithms: Seq[DistributedAlgorithm]) extends Actor wi
       .headOption
       .foreach(sendAppMsg(_, kind, payload))
 
+  /**
+   * Samples one message kind from the node's PDF using inverse-transform (CDF) sampling.
+   *
+   * The PDF is scanned left-to-right with a running cumulative sum.  A uniform random
+   * draw r ∈ [0,1) selects the first bucket whose cumulative probability exceeds r,
+   * which correctly weights selection by each entry's probability mass.
+   *
+   * The RNG is seeded with the node id (see constructor), so traffic generation is
+   * deterministic: re-running with the same graph and config always reproduces the
+   * same message sequence per node.
+   */
   private def sampleMessageKind(): String =
     if pdf.isEmpty then "PING"
     else

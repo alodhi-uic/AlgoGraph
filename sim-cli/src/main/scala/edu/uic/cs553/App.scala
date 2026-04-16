@@ -7,7 +7,7 @@ import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
 
-import edu.uic.cs553.sim.algorithms.{DistributedAlgorithm, HirschbergSinclairAlgorithm, TreeLeaderElection}
+import edu.uic.cs553.sim.algorithms.{DistributedAlgorithm, HirschbergSinclairAlgorithm, Snapshot, Termination, TreeLeaderElection}
 import edu.uic.cs553.sim.core.SimConfig
 import edu.uic.cs553.sim.core.enrich.GraphEnricher
 import edu.uic.cs553.sim.core.io.DotGraphLoader
@@ -22,6 +22,7 @@ object App:
 
     val graphDir    = config.getString("sim.graphDirectory")
     val runDuration = config.getInt("sim.runDurationMs")
+    val seed        = config.getInt("sim.seed")
 
     // ── Load graph ──────────────────────────────────────────────────────────
     val dotFile = latestDotFile(graphDir).getOrElse {
@@ -42,20 +43,31 @@ object App:
 
     val algorithmFactories: Seq[() => DistributedAlgorithm] = Seq(
       () => new HirschbergSinclairAlgorithm,
-      () => new TreeLeaderElection
+      () => new TreeLeaderElection,
+      () => new Snapshot,
+      () => new Termination
     )
 
-    val running = RuntimeBuilder.run(enrichedGraph, algorithmFactories)
+    val running = RuntimeBuilder.run(enrichedGraph, algorithmFactories, seed)
 
     // ── Inject external messages ────────────────────────────────────────────
     val injMode = config.getString("sim.injection.mode")
     injMode match
-      case "file"        => runFileInjection(config, running)
-      case "interactive" => runInteractiveInjection(running)
-      case other         => println(s"[WARN] unknown injection mode: $other")
+      case "file" =>
+        // Deliver scheduled events on a daemon thread; main thread sleeps for runDuration.
+        runFileInjection(config, running)
+        Thread.sleep(runDuration)
 
-    // ── Run for configured duration then shut down ──────────────────────────
-    Thread.sleep(runDuration)
+      case "interactive" =>
+        // Block the main thread on stdin so the JVM stays alive for as long as the user
+        // needs.  Algorithms run in actor threads and are unaffected.  Press Ctrl+D to
+        // finish — metrics are printed and the actor system shuts down immediately after.
+        runInteractiveInjection(running)
+
+      case other =>
+        println(s"[WARN] unknown injection mode: $other — falling back to timed run")
+        Thread.sleep(runDuration)
+
     println(SimMetrics.report())
     Await.result(running.system.terminate(), 5.seconds)
 
@@ -165,13 +177,27 @@ object App:
   /**
    * Interactive injection mode.
    *
-   * Reads commands from stdin on a daemon thread until the stream closes (Ctrl+D).
+   * Blocks the main thread reading commands from stdin until the stream closes
+   * (Ctrl+D).  Algorithms continue running in their actor threads throughout.
+   * When stdin closes, control returns to main and the simulation shuts down.
+   *
    * Command format:  <nodeId>  <kind>  <payload>
+   * Example:         1 WORK my-job
+   *
+   * IMPORTANT: requires running from inside the sbt shell, not batch mode.
+   *   Correct:   $ sbt          (enter shell first)
+   *              > simCli/run   (then run from inside)
+   *   Wrong:     $ sbt simCli/run   (batch mode — stdin is not forwarded)
    */
   private def runInteractiveInjection(running: RuntimeBuilder.RunningSimulation): Unit =
-    println("Interactive injection active.  Format: <nodeId> <kind> <payload>  (Ctrl+D to stop)")
+    println("─" * 50)
+    println("Interactive injection ready.")
+    println("Format : <nodeId> <kind> <payload>")
+    println("Example: 1 WORK my-job")
+    println("Stop   : Ctrl+D")
+    println("─" * 50)
 
-    // Tail-recursive stdin reader — no mutable loop variable needed
+    @annotation.tailrec
     def readLoop(): Unit =
       val line = scala.io.StdIn.readLine()
       if line != null then
@@ -180,23 +206,25 @@ object App:
             n.toIntOption match
               case Some(nodeId) =>
                 running.nodeRefs.get(nodeId) match
-                  case Some(ref) => ref ! NodeActor.ExternalInput(k, p)
-                  case None      => println(s"[INJECT] node $nodeId not found")
+                  case Some(ref) =>
+                    println(s"[INJECT] → node $nodeId  kind=$k  payload=$p")
+                    ref ! NodeActor.ExternalInput(k, p)
+                  case None => println(s"[INJECT] node $nodeId not found")
               case None => println(s"[INJECT] invalid node id: $n")
           case Array(n, k) =>
             n.toIntOption match
               case Some(nodeId) =>
                 running.nodeRefs.get(nodeId) match
-                  case Some(ref) => ref ! NodeActor.ExternalInput(k, "")
-                  case None      => println(s"[INJECT] node $nodeId not found")
+                  case Some(ref) =>
+                    println(s"[INJECT] → node $nodeId  kind=$k")
+                    ref ! NodeActor.ExternalInput(k, "")
+                  case None => println(s"[INJECT] node $nodeId not found")
               case None => println(s"[INJECT] invalid node id: $n")
           case _ =>
             println("Format: <nodeId> <kind> <payload>")
         readLoop()
 
-    val thread = new Thread(() => readLoop())
-    thread.setDaemon(true)
-    thread.start()
+    readLoop()
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 

@@ -19,10 +19,13 @@ object RuntimeBuilder:
    *
    * @param graph              the enriched graph (nodes + labeled edges + PDFs)
    * @param algorithmFactories one factory per algorithm; called once per node
+   * @param seed               global random seed from config; each node uses (seed XOR nodeId)
+   *                           so nodes produce independent but reproducible message sequences
    */
   def run(
     graph:              EnrichedGraph,
-    algorithmFactories: Seq[() => DistributedAlgorithm]
+    algorithmFactories: Seq[() => DistributedAlgorithm],
+    seed:               Int = 0
   ): RunningSimulation =
 
     val system = ActorSystem("sim")
@@ -32,7 +35,7 @@ object RuntimeBuilder:
       graph.nodes.map { node =>
         val algorithms = algorithmFactories.map(_())
         node.id -> system.actorOf(
-          NodeActor.props(node.id, algorithms),
+          NodeActor.props(node.id, algorithms, seed),
           s"node-${node.id}"
         )
       }.toMap

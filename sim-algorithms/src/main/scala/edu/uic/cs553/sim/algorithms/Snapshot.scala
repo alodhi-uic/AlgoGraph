@@ -36,8 +36,9 @@ final class Snapshot extends DistributedAlgorithm:
   // Each NodeActor creates its own Snapshot instance (via factory), so these
   // vars are actor-local and mutated only during single-threaded message
   // delivery — no synchronization required.  See DistributedAlgorithm for rationale.
-  private var initiated:        Boolean              = false
-  private var recorded:         Boolean              = false
+  // DistributedAlgorithm hooks return Unit so state must persist in instance fields.
+  private var initiated:        Boolean              = false  // true after node 0 fires the snapshot
+  private var recorded:         Boolean              = false  // true after local state is frozen
 
   /** Running count of application messages received before the snapshot. */
   private var msgCounts:        Map[String, Int]     = Map.empty

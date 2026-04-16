@@ -26,11 +26,12 @@ final class TreeLeaderElection extends DistributedAlgorithm:
   // Each NodeActor creates its own TreeLeaderElection instance (via factory), so
   // these vars are actor-local and mutated only during single-threaded message
   // delivery — no synchronization required.  See DistributedAlgorithm for rationale.
-  private var maxIdSeen: Int         = -1
-  private var receivedFrom: Set[Int] = Set.empty
-  private var leader: Option[Int]    = None
-  private var forwarded: Boolean     = false   // have we already sent TREE_MSG upstream?
-  private var forwardedTo: Int       = -1      // which neighbor we forwarded to
+  // DistributedAlgorithm hooks return Unit so state must persist in instance fields.
+  private var maxIdSeen: Int         = -1          // running max of all candidate IDs seen so far
+  private var receivedFrom: Set[Int] = Set.empty   // neighbors that have sent TREE_MSG to us
+  private var leader: Option[Int]    = None        // set once when TREE_LEADER arrives or we become root
+  private var forwarded: Boolean     = false       // true after we send TREE_MSG upstream
+  private var forwardedTo: Int       = -1          // the neighbor we forwarded to (center-edge tiebreak)
 
   // ---- lifecycle ------------------------------------------------
 

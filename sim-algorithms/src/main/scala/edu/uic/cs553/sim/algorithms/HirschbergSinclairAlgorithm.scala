@@ -21,16 +21,17 @@ final class HirschbergSinclairAlgorithm extends DistributedAlgorithm:
   override def name: String = "hirschberg-sinclair"
 
   // ---- per-node state (safe: each actor gets its own instance) ----
-  private var active: Boolean       = true
-  private var phase: Int            = 0
-  private var cwReplied: Boolean    = false
-  private var ccwReplied: Boolean   = false
-  private var leader: Option[Int]   = None
+  // DistributedAlgorithm hooks return Unit so state cannot be passed back as a
+  // return value — it must persist in instance fields between onMessage calls.
+  private var active: Boolean       = true    // false once this node is suppressed by a larger probe
+  private var phase: Int            = 0       // incremented when both CW and CCW replies arrive
+  private var cwReplied: Boolean    = false   // true when the CW reply for the current phase arrives
+  private var ccwReplied: Boolean   = false   // true when the CCW reply for the current phase arrives
+  private var leader: Option[Int]   = None    // set once when HS_LEADER is received or own probe wraps
 
-  // Set to false if topology validation fails — all handlers short-circuit
-  private var valid: Boolean = true
+  private var valid: Boolean = true           // false if topology check fails; all handlers short-circuit
 
-  // Ring neighbors resolved from ctx on first use
+  // Ring neighbors resolved lazily on first use (ctx not available at construction time)
   private var cw: Int  = -1
   private var ccw: Int = -1
 

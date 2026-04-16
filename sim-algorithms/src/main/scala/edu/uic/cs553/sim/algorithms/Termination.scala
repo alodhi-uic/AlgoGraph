@@ -35,20 +35,21 @@ final class Termination extends DistributedAlgorithm:
   // Each NodeActor creates its own Termination instance (via factory), so these
   // vars are actor-local and mutated only during single-threaded message
   // delivery — no synchronization required.  See DistributedAlgorithm for rationale.
+  // DistributedAlgorithm hooks return Unit so state must persist in instance fields.
 
-  private var initiated:  Boolean      = false
-  private var tickCount:  Int          = 0
+  private var initiated:  Boolean      = false  // true after node 0 sends the first DS_WORK wave
+  private var tickCount:  Int          = 0      // incremented on each onTick; initiates on tick 2
 
   /** The parent in the spanning tree; None means this is the root or not yet joined. */
-  private var parent:     Option[Int]  = None
+  private var parent:     Option[Int]  = None   // set once when first DS_WORK arrives
 
   /**
    * deficit = DS_WORK messages sent to children - DS_ACK messages received.
    * When deficit reaches zero the node's entire subtree has acknowledged.
    */
-  private var deficit:    Int          = 0
+  private var deficit:    Int          = 0      // decremented on each DS_ACK received
 
-  private var terminated: Boolean      = false
+  private var terminated: Boolean      = false  // guard against duplicate TERMINATION DETECTED logs
 
   // ── lifecycle ─────────────────────────────────────────────────────────────
 

@@ -73,23 +73,30 @@ Each run writes a `.ngs.dot` file and a `.ngs` binary to the configured output d
 
 ## Step 2 — Configure AlgoGraph
 
-`sim-cli/src/main/resources/application.conf` is pre-configured with a relative path that works out of the box when you run from the AlgoGraph root:
+Two sample graphs are committed in `sample-graphs/` so the simulation works on a clean clone **without running NetGameSim first**:
+
+| File | Topology | Best for |
+|------|----------|----------|
+| `tree-10nodes.ngs.dot` | 10-node general graph | TLE, Snapshot, DS (default) |
+| `ring-10nodes-hs.ngs.dot` | 10-node bidirectional ring | Hirschberg-Sinclair |
+
+The default config already points to `sample-graphs/`:
 
 ```hocon
 sim {
-  graphDirectory = "netgamesim/output"   # relative to project root — no edit needed
+  graphDirectory = "sample-graphs"   # uses the committed sample graph
   runDurationMs  = 6000
   ...
 }
 ```
 
-If you need to point to a different directory, override at runtime without touching the file:
+To use your own generated graph, override at runtime:
 
 ```bash
-sbt -Dsim.graphDirectory=/your/path simCli/run
+sbt -Dsim.graphDirectory=netgamesim/output simCli/run
 ```
 
-All other settings (PDFs, timers, edge labels, injection) are documented inline in the same file.
+All other settings (PDFs, timers, edge labels, injection) are documented inline in `sim-cli/src/main/resources/application.conf`.
 
 ---
 
@@ -296,7 +303,7 @@ sim {
 }
 ```
 
-Generate graph: `sbt run` in NetGameSim with `statesTotal = 10`.
+Uses the committed `sample-graphs/tree-10nodes.ngs.dot` — no generation needed.  To run HS on a ring, switch `graphDirectory = "sample-graphs"` and rename `ring-10nodes-hs.ngs.dot` to be the only `.ngs.dot` file (or point directly with `-Dsim.graphDirectory`).
 
 ---
 

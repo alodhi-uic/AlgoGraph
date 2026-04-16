@@ -25,10 +25,20 @@ object App:
     val seed        = config.getInt("sim.seed")
 
     // ── Load graph ──────────────────────────────────────────────────────────
-    val dotFile = latestDotFile(graphDir).getOrElse {
-      println(s"ERROR: no .ngs.dot file found in $graphDir")
-      sys.exit(1)
-    }
+    // If sim.graphFile is set, use that exact file; otherwise auto-pick the most
+    // recently modified .ngs.dot in graphDirectory (useful for netgamesim/output).
+    val dotFile =
+      if config.hasPath("sim.graphFile") then
+        val explicit = new File(config.getString("sim.graphFile"))
+        if !explicit.exists() then
+          println(s"ERROR: sim.graphFile not found: ${explicit.getAbsolutePath}")
+          sys.exit(1)
+        explicit
+      else
+        latestDotFile(graphDir).getOrElse {
+          println(s"ERROR: no .ngs.dot file found in $graphDir")
+          sys.exit(1)
+        }
     println(s"Loading graph from: ${dotFile.getAbsolutePath}")
 
     val graph = DotGraphLoader.load(dotFile.getAbsolutePath)

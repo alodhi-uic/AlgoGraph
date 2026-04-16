@@ -22,6 +22,12 @@ object NodeActor:
     inputEnabled:  Boolean
   ) extends Msg
 
+  // `kind` is a String rather than a sealed ADT variant so that each distributed
+  // algorithm can define its own message vocabulary (HS_PROBE, TREE_MSG, DS_WORK, …)
+  // without touching the shared Envelope type.  The trade-off (no exhaustiveness
+  // checking on kind) is acceptable here because algorithms dispatch on kind via
+  // pattern-matched string literals in their own onMessage handlers, keeping the
+  // open vocabulary intentional and documented.
   final case class Envelope(from: Int, kind: String, payload: String) extends Msg
   final case class ExternalInput(kind: String, payload: String)        extends Msg
   case object Start                                                     extends Msg

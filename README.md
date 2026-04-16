@@ -100,6 +100,12 @@ All other settings (PDFs, timers, edge labels, injection) are documented inline 
 
 ---
 
+## Step 2b — IntelliJ import (optional)
+
+Open IntelliJ → **File → Open** → select the `AlgoGraph` root directory → choose **Import as sbt project** when prompted. No manual module configuration is needed. All source roots and dependencies are declared in `build.sbt` and resolved automatically.
+
+---
+
 ## Step 3 — Run the simulation
 
 From the AlgoGraph root:

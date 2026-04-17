@@ -4,6 +4,12 @@ CS553 Course Project · University of Illinois Chicago
 
 Turns randomly generated graphs from [NetGameSim](https://github.com/0x1DOCD00D/NetGameSim) into a running Akka Classic actor system where every graph node is an actor and every graph edge is a typed message channel. Distributed algorithms plug into the same message substrate without touching the runtime.
 
+**Name:** Apoorv Lodhi  
+**UIN:** 661745011  
+**Algorithms implemented:**
+1. Hirschberg-Sinclair Leader Election (bidirectional ring)
+2. Tree Leader Election (spanning tree)
+
 ---
 
 ## Prerequisites
@@ -26,7 +32,9 @@ AlgoGraph/
 ├── sim-algorithms/      # Distributed algorithm implementations
 │   ├── DistributedAlgorithm.scala     # plug-in trait
 │   ├── HirschbergSinclairAlgorithm.scala
-│   └── TreeLeaderElection.scala
+│   ├── TreeLeaderElection.scala
+│   ├── Snapshot.scala
+│   └── Termination.scala
 ├── sim-cli/             # Command-line entry point — App.scala
 │   ├── inputs/inject.txt              # file-driven injection script
 │   └── src/main/resources/application.conf
@@ -80,20 +88,25 @@ Two sample graphs are committed in `sample-graphs/` so the simulation works on a
 | `tree-10nodes.ngs.dot` | 10-node general graph | TLE, Snapshot, DS (default) |
 | `ring-10nodes-hs.ngs.dot` | 10-node bidirectional ring | Hirschberg-Sinclair |
 
-The default config already points to `sample-graphs/`:
+**Selecting a sample graph** — uncomment one line in `sim-cli/src/main/resources/application.conf`:
 
 ```hocon
 sim {
-  graphDirectory = "sample-graphs"   # uses the committed sample graph
-  runDurationMs  = 6000
-  ...
+  # graphFile = "sample-graphs/tree-10nodes.ngs.dot"      # TLE, Snapshot, DS
+  # graphFile = "sample-graphs/ring-10nodes-hs.ngs.dot"   # Hirschberg-Sinclair
 }
 ```
 
-To use your own generated graph, override at runtime:
+When `graphFile` is set it takes precedence over `graphDirectory`. Leave both commented to auto-pick the most recently modified `.ngs.dot` from `graphDirectory` (the default for `netgamesim/output`).
 
-```bash
-sbt -Dsim.graphDirectory=netgamesim/output simCli/run
+**Default config** — points to your NetGameSim output folder:
+
+```hocon
+sim {
+  graphDirectory = "netgamesim/output"   # auto-picks most recent .ngs.dot
+  runDurationMs  = 6000
+  ...
+}
 ```
 
 All other settings (PDFs, timers, edge labels, injection) are documented inline in `sim-cli/src/main/resources/application.conf`.
@@ -309,7 +322,7 @@ sim {
 }
 ```
 
-Uses the committed `sample-graphs/tree-10nodes.ngs.dot` — no generation needed.  To run HS on a ring, switch `graphDirectory = "sample-graphs"` and rename `ring-10nodes-hs.ngs.dot` to be the only `.ngs.dot` file (or point directly with `-Dsim.graphDirectory`).
+Uses the committed `sample-graphs/tree-10nodes.ngs.dot` — no generation needed.  To run HS on a ring, uncomment `graphFile = "sample-graphs/ring-10nodes-hs.ngs.dot"` in `application.conf`.
 
 ---
 

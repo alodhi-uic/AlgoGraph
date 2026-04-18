@@ -10,6 +10,7 @@ Turns randomly generated graphs from [NetGameSim](https://github.com/0x1DOCD00D/
 1. Hirschberg-Sinclair Leader Election (bidirectional ring)
 2. Tree Leader Election (spanning tree)
 
+VIDEO: https://youtu.be/r-fIjS1JrII
 ---
 
 ## Prerequisites
